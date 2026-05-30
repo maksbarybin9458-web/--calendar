@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Депо График Смен</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Мой График">
+    <link rel="manifest" href="manifest.json">
+
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-main: #ffffff;
+            --text-muted: #aaaaaa;
+            --day-shift: #27ae60;
+            --night-shift: #2f80ed;
+            --study-shift: #0dafb5; /* Голубой цвет для смены У */
+            --vacation-shift: #f39c12; /* Оранжевый для Отпуска */
+            --tech-shift: #9b59b6; /* Фиолетовый для Тех. Обучения */
+            --accent: #e0e0e0;
+        }
+
+        body {
+            font-family: system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            user-select: none;
+        }
+
+        .auth-container, .app-container {
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .app-container { display: none; }
+
+        h2 { margin: 10px 0; font-weight: 600; text-align: center; }
+        
+        input, button {
+            padding: 15px;
+            border-radius: 10px;
+            border: none;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        input {
+            background-color: var(--card-bg);
+            color: var(--text-main);
+            text-align: center;
+        }
+
+        button {
+            background-color: var(--day-shift);
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* Новые стили для шкал статистики */
+        .stats-container {
+            width: 100%;
+            background-color: var(--card-bg);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .stat-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        .stat-label span:last-child {
+            color: var(--text-main);
+            font-weight: 600;
+        }
+        .progress-track {
+            width: 100%;
+            height: 8px;
+            background-color: #333;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease-out;
+            width: 0%;
+        }
+        .norm-fill { background-color: #888; }
+        .worked-fill { background-color: var(--day-shift); }
+        .total-fill { background-color: var(--night-shift); }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            background-color: var(--card-bg);
+            padding: 10px;
+            border-radius: 15px;
+        }
+
+        .weekday {
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: bold;
+            padding-bottom: 5px;
+        }
+
+        .day {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+            min-height: 60px;
+            box-sizing: border-box;
+            font-size: 14px;
+            border-radius: 6px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .day-number {
+            font-weight: bold;
+        }
+
+        .day-route {
+            font-size: 10px;
+            margin-top: 3px;
+            text-align: center;
+            line-height: 1.1;
+            word-break: break-word;
+            color: #ffffff;
+            font-weight: 600;
+            opacity: 0.85;
+        }
+
+        .day.other-month { color: #444; }        
+
+        .day.today { background-color: #333; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.2); }
+        .day.has-day-shift { background-color: var(--day-shift); color: #ffffff; }
+        .day.has-night-shift { background-color: var(--night-shift); color: #ffffff; }
+        .day.has-study-shift { background-color: var(--study-shift); color: #ffffff; }
+        .day.has-vacation-shift { background-color: var(--vacation-shift); color: #ffffff; }
+        .day.has-tech-shift { background-color: var(--tech-shift); color: #ffffff; }
+        .day.selected { box-shadow: inset 0 0 0 3px var(--text-main); }
+
+        .details-card {
+            background-color: var(--card-bg);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .details-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 15px;
+        }
+
+        .info-label { color: var(--text-muted); }
+        .info-value { font-weight: 500; text-align: right; }
+
+        /* Новая единая шапка */
+        .profile-header {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .profile-top-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .profile-user-info {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        #profileUserName {
+            font-weight: 600;
+            font-size: 16px;
+        }
+        #profileUserPosition {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .logout-btn {
+            padding: 8px 12px;
+            font-size: 12px;
+            margin: 0;
+            background-color: rgba(255, 69, 58, 0.15);
+            border: 1px solid rgba(255, 69, 58, 0.2);
+            color: #ff453a;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .profile-main-stats {
+            text-align: center;
+        }
+        #profileEarnedSalary {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--day-shift);
+            line-height: 1;
+        }
+        #profileEarnedSalaryLabel {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="authScreen" class="auth-container">
+        <h2 style="margin-top: 40px;">График Смен Депо</h2>
+        <p style="text-align: center; color: var(--text-muted);">Введи свой табельный номер</p>
+        <input type="number" id="userInput" placeholder="Например: 34045" enterkeyhint="go" onkeypress="if(event.key === 'Enter') login()">
+        <button onclick="login()">Войти в график</button>
+    </div>
+
+    <div id="appScreen" class="app-container">
+
+        <!-- Новая единая шапка -->
+        <div class="profile-header">
+            <div class="profile-top-row">
+                <div class="profile-user-info">
+                    <span id="profileUserName"></span>
+                    <span id="profileUserPosition"></span>
+                </div>
+                <button onclick="logout()" class="logout-btn">Выйти</button>
+            </div>
+            <div class="profile-main-stats">
+                <span id="profileEarnedSalary">0 ₽</span>
+                <span id="profileEarnedSalaryLabel">Примерная оплата</span>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">
+                    <span>Часы (отработано / план / норма)</span>
+                    <span id="hoursProgressText">0 / 0 ч</span>
+                </div>
+                <div class="progress-track">
+                    <div class="progress-fill worked-fill" id="hoursProgressBar"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="calendar-header">
+            <button onclick="changeMonth(-1)" style="padding: 5px 15px; margin:0;">◀</button>
+            <h2 id="monthTitle">Май 2026</h2>
+            <button onclick="changeMonth(1)" style="padding: 5px 15px; margin:0;">▶</button>
+        </div>
+
+        <div class="calendar-grid" id="calendarGrid">
+            <div class="weekday">Пн</div><div class="weekday">Вт</div><div class="weekday">Ср</div>
+            <div class="weekday">Чт</div><div class="weekday">Пт</div><div class="weekday">Сб</div><div class="weekday">Вс</div>
+        </div>
+
+        <div class="details-card" id="detailsCard">
+            <div class="details-title" id="detailsDate">Выберите день смены</div>
+            <div id="detailsContent">
+                <p style="color: var(--text-muted); text-align: center;">Нажмите на подсвеченный день, чтобы увидеть наряд.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let userShifts = {}; 
+        let currentDate = new Date();
+        const monthsRu = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+        
+        const MACHINIST_RATE = 1000;
+        const ASSISTANT_RATE = 750;
+
+        function getUserRate() {
+            const position = (localStorage.getItem('depotPosition') || '').toLowerCase();
+            // Сначала проверяем помощника, т.к. "помощник машиниста" содержит "машинист"
+            if (position.includes('помощник') || position.includes('тчмп')) {
+                return ASSISTANT_RATE;
+            } else if (position.includes('машинист') || position.includes('тчм')) {
+                return MACHINIST_RATE;
+            }
+            return 0; // Ставка по умолчанию, если должность не определена
+        }
+
+        // Жестко заданные нормы часов на 2026 и 2027 годы (месяцы от 0 до 11)
+        const hardcodedNorms = {
+            "2026-0": 120, "2026-1": 152, "2026-2": 168, "2026-3": 175, "2026-4": 151, "2026-5": 167, "2026-6": 184, "2026-7": 168, "2026-8": 176, "2026-9": 176, "2026-10": 159, "2026-11": 176,
+            "2027-0": 120, "2027-1": 152, "2027-2": 176, "2027-3": 167, "2027-4": 143, "2027-5": 167, "2027-6": 176, "2027-7": 176, "2027-8": 176, "2027-9": 168, "2027-10": 167, "2027-11": 184
+        };
+
+        window.onload = () => {
+            const savedData = localStorage.getItem('depotShifts');
+            const savedFio = localStorage.getItem('depotFio');
+            const savedPosition = localStorage.getItem('depotPosition');
+            if (savedData && savedFio) {
+                userShifts = JSON.parse(savedData) || {}; // Убедимся, что userShifts всегда объект
+                document.getElementById("userInput").value = localStorage.getItem('depotTab') || "";
+                showApp(savedFio, savedPosition);
+            }
+        };
+
+        function login() {
+            const input = document.getElementById("userInput").value.trim();
+            if (!input) return alert("Введи табельный номер!");
+            
+            const btn = document.querySelector("#authScreen button");
+            btn.innerText = "Загрузка...";
+            btn.disabled = true;
+
+            // Вставлена новая актуальная ссылка для связи с Google Apps Script
+            const API_URL = "https://script.google.com/macros/s/AKfycbwC2wVWsosFLiZ823o2NIbWFN9ROjtxUmy7CjZy3Liqd7M-z8Smqe0se6XdSqnUI3DA0Q/exec";
+            
+            fetch(API_URL, { // Убираем ?tab=${input} из URL, т.к. скрипт теперь возвращает всех
+                method: "GET",
+                redirect: "follow", // Жизненно важно для обхода 302 редиректа Гугла
+                headers: {
+                    "Content-Type": "text/plain;charset=utf-8",
+                }
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            throw new Error(`HTTP ошибка! Статус: ${response.status}, Ответ: ${text}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    btn.innerText = "Войти в график";
+                    btn.disabled = false;
+                    
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    
+                    // Поддержка новой структуры { employees, norms } или старой [ ... ]
+                    const employees = data.employees || data;
+
+                    // Ищем сотрудника по полю tabNumber
+                    const employee = employees.find(emp => emp.tabNumber === input);
+                    
+                    if (!employee) {
+                        if (employees && employees.length > 0) {
+                            console.log('Отладка: табельный номер первого сотрудника в списке:', employees[0].tabNumber);
+                        }
+                        throw new Error("Сотрудник с таким табельным не найден в базе");
+                    }
+
+                    // Конвертируем массив смен в объект для календаря
+                    const formattedShifts = {};
+                    if (employee.shifts && Array.isArray(employee.shifts)) {
+                        employee.shifts.forEach(shift => {
+                            const parts = shift.date.split('-'); 
+                            if (parts.length === 3) {
+                                const dateKey = `${parts[2]}.${parts[1]}.${parts[0]}`;
+                                formattedShifts[dateKey] = shift;
+                            }
+                        });
+                    }
+                    
+                    userShifts = formattedShifts;
+                    localStorage.setItem('depotShifts', JSON.stringify(userShifts));
+                    localStorage.setItem('depotFio', employee.fio);
+                    localStorage.setItem('depotTab', employee.tabNumber);
+                    
+                    const position = employee.position || employee.Position || 'Сотрудник';
+                    localStorage.setItem('depotPosition', position);
+                    showApp(employee.fio, position);
+                })
+                .catch(err => {
+                    btn.innerText = "Войти в график";
+                    btn.disabled = false;
+                    console.error("Ошибка при получении данных:", err); // Логируем полную ошибку для отладки
+                    alert(`Ошибка загрузки данных: ${err.message || "Неизвестная ошибка"}. Проверь интернет или табельный номер.`);
+                });
+        }
+
+        function showApp(fio, position) {
+            document.getElementById("authScreen").style.display = "none";
+            document.getElementById("appScreen").style.display = "flex";
+            
+            document.getElementById("profileUserName").innerText = fio;
+            document.getElementById("profileUserPosition").innerText = position || "Сотрудник";
+            renderCalendar();
+        }
+
+        function logout() {
+            localStorage.removeItem('depotShifts');
+            localStorage.removeItem('depotFio');
+            localStorage.removeItem('depotTab');
+            localStorage.removeItem('depotPosition');
+            location.reload();
+        }
+
+        function getWorkHoursNorm(year, month) {
+            // Используем жестко заданные нормы
+            const key = `${year}-${month}`;
+            if (hardcodedNorms[key]) {
+                return hardcodedNorms[key];
+            }
+
+            // Иначе считаем по старинке (математически, 40ч/нед)
+            let hours = 0;
+            const totalDays = new Date(year, month + 1, 0).getDate();
+            for (let d = 1; d <= totalDays; d++) {
+                const dayOfWeek = new Date(year, month, d).getDay();
+                if (dayOfWeek !== 0 && dayOfWeek !== 6) hours += 8;
+            }
+            return hours;
+        }
+
+        function renderCalendar() {
+            const grid = document.getElementById("calendarGrid");
+            const weekdays = grid.querySelectorAll('.weekday');
+            grid.innerHTML = "";
+            weekdays.forEach(w => grid.appendChild(w));
+
+            const realToday = new Date();
+            const todayDateOnly = new Date(realToday.getFullYear(), realToday.getMonth(), realToday.getDate());
+
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            
+            document.getElementById("monthTitle").innerText = `${monthsRu[month]} ${year}`;
+
+            const firstDay = new Date(year, month, 1);
+            let startDay = firstDay.getDay() - 1;
+            if (startDay === -1) startDay = 6;
+
+            const totalDays = new Date(year, month + 1, 0).getDate();
+
+            let totalMonthHours = 0;
+            let workedHours = 0;
+
+            for (let i = 0; i < startDay; i++) {
+                const div = document.createElement("div");
+                div.className = "day other-month";
+                grid.appendChild(div);
+            }
+
+            for (let d = 1; d <= totalDays; d++) {
+                const div = document.createElement("div");
+                div.className = "day";
+
+                if (year === realToday.getFullYear() && month === realToday.getMonth() && d === realToday.getDate()) {
+                    div.classList.add("today");
+                }
+
+                const dStr = String(d).padStart(2, '0');
+                const mStr = String(month + 1).padStart(2, '0');
+                const dateKey = `${dStr}.${mStr}.${year}`;
+                
+                const shift = userShifts[dateKey];
+                
+                let cellHTML = `<span class="day-number">${d}</span>`;
+
+                if (shift) {
+                    // Универсальный подсчет часов: парсим строку, меняем запятую на точку (защита от формата Excel)
+                    const parsedHours = parseFloat(String(shift.hours || "0").replace(',', '.')) || 0;
+                    totalMonthHours += parsedHours;
+                    
+                    const shiftDateOnly = new Date(year, month, d);
+                    if (shiftDateOnly <= todayDateOnly) {
+                        workedHours += parsedHours;
+                    }
+
+                    let routeDisplay = shift.route || "";
+                    if (typeof shift.route === 'string') {
+                        const routeLower = shift.route.trim().toLowerCase();
+                        routeDisplay = shift.route.trim();
+                        
+                        if (routeLower.includes("то") || routeLower === "то") {
+                            div.classList.add("has-tech-shift");
+                            div.onclick = () => showDetails(dateKey, d, month, year, shift, div);
+                        } else if (routeLower.includes("д")) {
+                            div.classList.add("has-day-shift");
+                            div.onclick = () => showDetails(dateKey, d, month, year, shift, div);
+                        } else if (routeLower.includes("н")) {
+                            div.classList.add("has-night-shift");
+                            div.onclick = () => showDetails(dateKey, d, month, year, shift, div);
+                        } else if (routeLower.includes("у") && routeLower !== "отпуск") {
+                            div.classList.add("has-study-shift");
+                            div.onclick = () => showDetails(dateKey, d, month, year, shift, div);
+                        } else if (routeLower === "выходной" || routeLower === "в") {
+                             div.onclick = () => showEmpty(d, month, year, div, "Выходной");
+                        } else if (routeLower === "отпуск" || routeLower === "о") {
+                             div.classList.add("has-vacation-shift");
+                             div.onclick = () => showEmpty(d, month, year, div, "Отпуск");
+                        } else {
+                            div.onclick = () => showDetails(dateKey, d, month, year, shift, div);
+                        }
+                    } else {
+                        div.onclick = () => showDetails(dateKey, d, month, year, shift, div);
+                    }
+
+                    const skipRouteText = ["выходной", "в", "отпуск", "о"];
+                    if (routeDisplay && !skipRouteText.includes(String(routeDisplay).toLowerCase())) {
+                        cellHTML += `<span class="day-route">${routeDisplay}</span>`;
+                    }
+                } else {
+                    div.onclick = () => showEmpty(d, month, year, div, "Смен не запланировано");
+                }
+
+                div.innerHTML = cellHTML;
+                grid.appendChild(div);
+            }
+
+            // Обновляем новую шапку
+            const rate = getUserRate();
+            const earnedSalary = workedHours * rate;
+            const normHours = getWorkHoursNorm(year, month);
+            document.getElementById("profileEarnedSalary").innerText = `${earnedSalary.toLocaleString('ru-RU')} ₽`;
+            
+            document.getElementById("hoursProgressText").innerText = `${parseFloat(workedHours.toFixed(1))} / ${parseFloat(totalMonthHours.toFixed(1))} / ${normHours} ч`;
+            const hoursProgressPercentage = totalMonthHours > 0 ? (workedHours / totalMonthHours) * 100 : 0;
+            document.getElementById("hoursProgressBar").style.width = `${hoursProgressPercentage}%`;
+        }
+
+        function changeMonth(direction) {
+            currentDate.setDate(1); 
+            currentDate.setMonth(currentDate.getMonth() + direction);
+            renderCalendar();
+        }
+
+        function formatMonthGenitive(monthIndex) {
+            const monthsGenitive = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+            return monthsGenitive[monthIndex];
+        }
+
+        function showDetails(key, day, month, year, shift, target) {
+            document.querySelectorAll('.day').forEach(d => d.classList.remove('selected'));
+            if(target) target.classList.add('selected');
+
+            document.getElementById("detailsDate").innerText = `Смена на ${day} ${formatMonthGenitive(month)} ${year}`;
+            
+            let typeLabel = 'Обычная';
+            let color = 'var(--accent)';
+            let routeDisplay = shift.route || 'Не указан';
+            let routeLower = '';
+            if (typeof shift.route === 'string') {
+                routeLower = shift.route.trim().toLowerCase();
+            }
+            
+            if(routeLower.includes('то') || routeLower === 'то') { typeLabel = 'Тех. Обучение'; color = 'var(--tech-shift)'; }
+            else if(routeLower.includes('д')) { typeLabel = 'День'; color = 'var(--day-shift)'; }
+            else if(routeLower.includes('н')) { typeLabel = 'Ночь'; color = 'var(--night-shift)'; }
+            else if(routeLower.includes('у') && routeLower !== 'отпуск') { typeLabel = 'Утро'; color = 'var(--study-shift)'; }
+            else if(routeLower === 'о' || routeLower === 'отпуск') { typeLabel = 'Отпуск'; color = 'var(--vacation-shift)'; }
+            else if(routeLower === 'в' || routeLower === 'выходной') { typeLabel = 'Выходной'; color = 'var(--text-muted)'; }
+
+            let detailsHTML = `
+                <div class="info-row"><span class="info-label">Тип смены: </span><span class="info-value" style="color:${color}">${typeLabel}</span></div>
+                <div class="info-row"><span class="info-label">Маршрут: </span><span class="info-value">${routeDisplay}</span></div>
+            `;
+
+            // Отображаем новые данные из API
+            if (shift.startTime || shift.endTime) {
+                detailsHTML += `<div class="info-row"><span class="info-label">Время работы: </span><span class="info-value">${shift.startTime || '?'} - ${shift.endTime || '?'}</span></div>`;
+            }
+            if (shift.trainNum) {
+                detailsHTML += `<div class="info-row"><span class="info-label">Поезда: </span><span class="info-value" style="text-align: right;">${shift.trainNum}</span></div>`;
+            }
+            if (shift.lunch) {
+                detailsHTML += `<div class="info-row"><span class="info-label">Обед/отдых: </span><span class="info-value" style="white-space: pre-wrap; text-align: right;">${shift.lunch}</span></div>`;
+            }
+
+            const rate = getUserRate();
+            const parsedHours = parseFloat(String(shift.hours || "0").replace(',', '.')) || 0;
+            const shiftPayment = parsedHours * rate;
+
+            detailsHTML += `
+                <div class="info-row" style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #333;"><span class="info-label">Часов в смене: </span><span class="info-value">${shift.hours} ч</span></div>`;
+            
+            if (shift.nightHours) {
+                 detailsHTML += `<div class="info-row"><span class="info-label">Ночные: </span><span class="info-value">${shift.nightHours} ч</span></div>`;
+            }
+
+            if (rate > 0 && parsedHours > 0) {
+                detailsHTML += `<div class="info-row"><span class="info-label">Оплата за смену: </span><span class="info-value" style="color: var(--day-shift); font-weight: bold;">≈ ${shiftPayment.toLocaleString('ru-RU')} ₽</span></div>`;
+            }
+
+            document.getElementById("detailsContent").innerHTML = detailsHTML;
+        }
+
+        function showEmpty(day, month, year, target, msg) {
+            document.querySelectorAll('.day').forEach(d => d.classList.remove('selected'));
+            if(target) target.classList.add('selected');
+            document.getElementById("detailsDate").innerText = `${day} ${formatMonthGenitive(month)} ${year}`;
+            document.getElementById("detailsContent").innerHTML = `<p style="color: var(--text-muted); text-align: center;">${msg}</p>`;
+        }
+    </script>
+</body>
+</html>
